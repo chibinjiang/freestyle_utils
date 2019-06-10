@@ -2,7 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+dist/
+freestyle_utils.egg-info/
+build/
+.idea/
 # C extensions
 *.so
 

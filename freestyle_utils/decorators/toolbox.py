@@ -42,7 +42,7 @@ def timeit(func):
         ts = time.time()
         result = func(*args, **kw)
         te = time.time()
-        print '%r  %6.8f seconds' % (method.__name__, te - ts)
+        print('%r  %6.8f seconds' % (func.__name__, te - ts))
         return result
     return timed
 

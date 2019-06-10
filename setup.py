@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 from os import path
-
+from __version__ import __version__
 DIR = path.dirname(path.abspath(__file__))
 INSTALL_PACKAGES = open(path.join(DIR, 'requirements.txt')).read().splitlines()
 
@@ -15,7 +15,7 @@ setup(
     long_description=README,
     long_description_content_type='text/markdown',
     install_requires=INSTALL_PACKAGES,
-    version='0.0.2',
+    version=__version__,
     url='https://github.com/chibinjiang/freestyle_utils',
     author='zhibin.jiang',
     author_email='jiangzhibin2014.xujie@gmail.com',

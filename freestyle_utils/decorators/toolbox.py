@@ -77,3 +77,24 @@ def after_timeout():  # 超时后的处理函数
     print("Time out!")
 
 
+def catch_400_message(logger=None):
+    """
+    捕获 Resource 的方法的异常, 返回 400 和 error_message
+    :param logger: logger
+    :return:
+    """
+    def deco_catch(func):
+        @wraps(func)
+        def catch_exception(*args, **kw):
+            try:
+                return func(*args, **kw)
+            except Exception as e:
+                if logger:
+                    logger.error("TRACEBACK", traceback.format_exc())
+                else:
+                    traceback.print_exc()
+                return {'error_message': e.message}, 400
+        return catch_exception
+    return deco_catch
+
+

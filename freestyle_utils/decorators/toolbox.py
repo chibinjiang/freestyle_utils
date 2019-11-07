@@ -4,6 +4,36 @@ import traceback
 from functools import wraps
 
 
+def async_retry(exceptions, retries=3, delay=2, back_off=3, logger=None):
+    """
+    加上重试, 应该是执行了 retries + 1 次
+    :param exceptions: 异常列表
+    :param retries:
+    :param delay: 基数
+    :param back_off: 底数
+    :param logger:
+    :return:
+    """
+    def deco_retry(f):
+        @wraps(f)
+        async def f_retry(*args, **kwargs):
+            for i in range(retries):
+                idle_time = delay * pow(back_off, i)
+                try:
+                    result = await f(*args, **kwargs)
+                    return result
+                except exceptions as e:
+                    if logger:
+                        logger.error(traceback.format_exc())
+                    else:
+                        traceback.print_exc()
+                    time.sleep(idle_time)
+            result = await f(*args, **kwargs)
+            return result
+        return f_retry
+    return deco_retry
+
+
 def retry(exceptions, tries=3, delay=3, backoff=2, logger=None):
     """
     retry decorator, if raise some exceptions, retry <tries> times.

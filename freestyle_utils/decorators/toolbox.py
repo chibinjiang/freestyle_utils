@@ -7,8 +7,6 @@ import hashlib
 from itertools import chain
 from typing import Callable, Any
 
-from redis import StrictRedis
-
 
 def async_retry(exceptions, retries=3, delay=2, back_off=3, logger=None):
     """
@@ -150,31 +148,20 @@ def _gen_key(func: Callable, *args, **kwargs):
     """
     make cache key with func name & args & kwargs
     根据function & args & kwargs 生成缓存key
-
-    :param func: function
-    :param args: function`s args
-    :param kwargs: function`s kwargs
-    :return: key[str]
     """
-
     def parameter_check(x: Any):
         """
         parameter check
         参数检查
-
-        :param x: parameter
-        :return: bool
         """
         return (hasattr(x, '__str__')) and (isinstance(x, type) is False)
-
     # make cache args & cache kwargs
     cached_args = map(str, filter(parameter_check, args))
     cached_kwargs = map(str, filter(parameter_check, kwargs.values()))
-
     # make a formatted key & md5 args
     args_key = '_'.join(chain(cached_args, cached_kwargs)).encode('utf8')
     key = f'{func.__module__}.{func.__name__}.{hashlib.md5(args_key).hexdigest() if len(args_key) != 0 else ""}'
-    return key
+    return key.strip(".")
 
 
 # 改成 装饰器
@@ -187,14 +174,16 @@ def cache_key(f):
         key = _gen_key(f, *args, **kwargs)
         print(key)
         return key
-
     return deco_cache
 
 
-redis_conn = StrictRedis()
-
-
-def cache_by_redis(expire=None):
+def cache_by_redis(redis_conn, expire=None):
+    """
+    只针对返回字典和列表的函数和 类方法
+    :param redis_conn:
+    :param expire:
+    :return:
+    """
     def deco_cache(func):
         @wraps(func)
         def cache(*args, **kwargs):
@@ -207,10 +196,61 @@ def cache_by_redis(expire=None):
                 value = func(*args, **kwargs)
                 cache_value = json.dumps(value)
                 if isinstance(expire, int):
-                    redis_conn.setex(key, cache_value, expire)
+                    redis_conn.setex(key, expire, cache_value)
                 else:
                     redis_conn.set(key, cache_value)
             return value
         return cache
+    return deco_cache
 
+
+def _gen_self_key(class_name, func: Callable, *args, **kwargs):
+    """
+    make cache key with func name & args & kwargs
+    根据function & args & kwargs 生成缓存key
+    """
+    def parameter_check(x: Any):
+        """
+        parameter check
+        参数检查
+        """
+        return (hasattr(x, '__str__')) and (isinstance(x, type) is False)
+    # make cache args & cache kwargs
+    cached_args = map(str, filter(parameter_check, args))
+    cached_kwargs = map(str, filter(parameter_check, kwargs.values()))
+
+    # make a formatted key & md5 args
+    args_key = '_'.join(chain(cached_args, cached_kwargs)).encode('utf8')
+    tokens = [
+        func.__module__, class_name, func.__name__,
+        hashlib.md5(args_key).hexdigest() if len(args_key) != 0 else ""
+    ]
+    return ".".join(tokens).strip(".")
+
+
+def cache_response(redis_conn, expire=None):
+    """
+    只针对 GET API 接口
+    :param redis_conn:
+    :param expire:
+    :return:
+    """
+    def deco_cache(func):
+        @wraps(func)
+        def cache(*args, **kwargs):
+            class_name = args[0].__class__.__name__  # 避免大家都是get, 不好区分
+            key = _gen_self_key(class_name, func, *args[1:], **kwargs)
+            cache_value = redis_conn.get(key)
+            if cache_value is not None:
+                value = json.loads(cache_value)
+            else:
+                # 没有
+                value = func(*args, **kwargs)
+                cache_value = json.dumps(value)
+                if isinstance(expire, int):
+                    redis_conn.setex(key, expire, cache_value)
+                else:
+                    redis_conn.set(key, cache_value)
+            return value
+        return cache
     return deco_cache
